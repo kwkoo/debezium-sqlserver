@@ -1,0 +1,154 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: source-mssql
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: source-scc-anyuid
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - anyuid
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: source-sa-to-scc-anyuid
+subjects:
+  - kind: ServiceAccount
+    name: source-mssql
+roleRef:
+  kind: Role
+  name: source-scc-anyuid
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    app.openshift.io/connects-to: debezium
+  labels:
+    app: source-mssql
+    app.kubernetes.io/component: source-mssql
+    app.kubernetes.io/instance: source-mssql
+    app.openshift.io/runtime: mssql
+  name: source-mssql
+spec:
+  selector:
+    matchLabels:
+      app: source-mssql
+  serviceName: "source-mssql"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: source-mssql
+    spec:
+      serviceAccountName: source-mssql
+      containers:
+      - env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_SA_PASSWORD
+          value: Password!
+        - name: MSSQL_PID
+          value: Standard
+        - name: MSSQL_AGENT_ENABLED
+          value: "true"
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - "-c"
+              - |
+                until /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q "SELECT * from SYS.TABLES"; do
+                  sleep 5
+                done
+                /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P $MSSQL_SA_PASSWORD -i /opt/workshop/data.sql
+        imagePullPolicy: IfNotPresent
+        name: source-mssql
+        workingDir: /var/opt/mssql
+        ports:
+        - containerPort: 1433
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/opt/mssql
+          name: db-data
+        - mountPath: /opt/workshop
+          name: data-sql
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsUser: 0
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: source-data-sql
+        name: data-sql
+  volumeClaimTemplates:
+  - metadata:
+      name: db-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+data:
+  data.sql: "-- Create a new database called 'InternationalDB'\n-- Connect to the
+    'master' database to run this snippet\nUSE master\nGO\n-- Create the new database
+    if it does not exist already\nIF NOT EXISTS (\n    SELECT name\n        FROM sys.databases\n
+    \       WHERE name = N'InternationalDB'\n)\nCREATE DATABASE InternationalDB\nGO\n\n--
+    Connect to the 'InternationalDB' database to run this snippet\nUSE InternationalDB\nGO\n\n--
+    Enable Database for CDC template\nEXEC sys.sp_cdc_enable_db\nGO\n\n-- Create a
+    new table called 'Customers' in schema 'dbo'\n-- Drop the table if it already
+    exists\nIF OBJECT_ID('dbo.Customers', 'U') IS NOT NULL\nDROP TABLE dbo.Customers\nGO\n--
+    Create the table in the specified schema\nCREATE TABLE dbo.Customers (\n  id int
+    NOT NULL,\n  first_name varchar(255) NOT NULL,\n  last_name varchar(255) NOT NULL,\n
+    \ email varchar(255) NOT NULL UNIQUE,\n  PRIMARY KEY (id)\n);\nGO\n\n-- Enable
+    CDC for table \nEXEC sys.sp_cdc_enable_table\n@source_schema = N'dbo',\n@source_name
+    = N'Customers',\n@role_name = NULL,\n@supports_net_changes = 0\nGO\n\nINSERT INTO
+    dbo.Customers VALUES (1001,'Sally','Thomas','sally.thomas@acme.com');\nINSERT
+    INTO dbo.Customers VALUES (1002,'George','Bailey','gbailey@foobar.com');\nINSERT
+    INTO dbo.Customers VALUES (1003,'Edward','Walker','ed@walker.com');\nGO\n"
+kind: ConfigMap
+metadata:
+  name: source-data-sql
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: source-mssql
+    app.kubernetes.io/component: source-mssql
+    app.kubernetes.io/instance: source-mssql
+  name: source-mssql
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 1433
+    protocol: TCP
+    targetPort: 1433
+  selector:
+    app: source-mssql
+  sessionAffinity: None
+  type: ClusterIP

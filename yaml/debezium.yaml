@@ -1,0 +1,42 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: debezium-streams-connect
+spec:
+  lookupPolicy:
+    local: false
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata:
+  name: debezium-kafka-connect-cluster
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+spec:
+  version: 3.6.0
+  config:
+    topic.creation.enable: "true"
+    topic.creation.default.replication.factor: -1
+    topic.creation.default.partitions: -1
+    offset.storage.replication.factor: 1
+    config.storage.replication.factor: 1
+    status.storage.replication.factor: 1
+  build:
+    output:
+      type: imagestream
+      image: debezium-streams-connect:latest
+    plugins:
+      - name: debezium-connector-sqlserver
+        artifacts:
+          - type: zip
+            url: https://maven.repository.redhat.com/ga/io/debezium/debezium-connector-sqlserver/2.5.4.Final-redhat-00001/debezium-connector-sqlserver-2.5.4.Final-redhat-00001-plugin.zip
+          - type: zip
+            url: https://maven.repository.redhat.com/ga/io/apicurio/apicurio-registry-distro-connect-converter/2.4.4.Final-redhat-00002/apicurio-registry-distro-connect-converter-2.4.4.Final-redhat-00002.zip
+          - type: zip
+            url: https://maven.repository.redhat.com/ga/io/debezium/debezium-scripting/2.5.4.Final-redhat-00001/debezium-scripting-2.5.4.Final-redhat-00001.zip
+      - name: debezium-connector-jdbc
+        artifacts:
+          - type: zip
+            url: https://maven.repository.redhat.com/ga/io/debezium/debezium-connector-jdbc/2.5.4.Final-redhat-00001/debezium-connector-jdbc-2.5.4.Final-redhat-00001-plugin.zip
+  bootstrapServers: demo-kafka-bootstrap:9092
+  replicas: 1

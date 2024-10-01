@@ -1,0 +1,19 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  labels:
+    strimzi.io/cluster: debezium-kafka-connect-cluster
+  name: debezium-connector
+spec:
+  class: io.debezium.connector.sqlserver.SqlServerConnector
+  config:
+    schema.history.internal.kafka.bootstrap.servers: demo-kafka-bootstrap:9092
+    schema.history.internal.kafka.topic: schema-changes
+    database.hostname: source-mssql
+    database.port: 1433
+    database.user: sa
+    database.password: Password!
+    database.names: InternationalDB
+    database.encrypt: "false"
+    topic.prefix: debezium
+  tasksMax: 1

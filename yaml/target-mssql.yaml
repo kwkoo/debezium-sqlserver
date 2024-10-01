@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: target-mssql
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: target-scc-anyuid
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - anyuid
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: target-sa-to-scc-anyuid
+subjects:
+  - kind: ServiceAccount
+    name: target-mssql
+roleRef:
+  kind: Role
+  name: target-scc-anyuid
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: target-mssql
+    app.kubernetes.io/component: target-mssql
+    app.kubernetes.io/instance: target-mssql
+    app.openshift.io/runtime: mssql
+  name: target-mssql
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: target-mssql
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: target-mssql
+        deploymentconfig: target-mssql
+    spec:
+      serviceAccountName: target-mssql
+      containers:
+      - env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_SA_PASSWORD
+          value: Password!
+        - name: MSSQL_PID
+          value: Standard
+        - name: MSSQL_AGENT_ENABLED
+          value: "true"
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - "-c"
+              - |
+                until /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q "SELECT * from SYS.TABLES"; do
+                  sleep 5
+                done
+                /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P $MSSQL_SA_PASSWORD -i /opt/workshop/data.sql
+        imagePullPolicy: IfNotPresent
+        name: target-mssql
+        ports:
+        - containerPort: 1433
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/opt/mssql
+          name: db-data
+        - mountPath: /opt/workshop
+          name: data-sql
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsUser: 0
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: db-data
+        persistentVolumeClaim:
+          claimName: target-mssql-volume
+      - configMap:
+          defaultMode: 420
+          name: target-data-sql
+        name: data-sql
+---
+apiVersion: v1
+data:
+  data.sql: "-- Create a new database called 'InternationalDB'\n-- Connect to the
+    'master' database to run this snippet\nUSE master\nGO\n-- Create the new database
+    if it does not exist already\nIF NOT EXISTS (\n    SELECT name\n        FROM sys.databases\n
+    \       WHERE name = N'InternationalDB'\n)\nCREATE DATABASE InternationalDB\nGO\n--
+    Connect to the 'InternationalDB' database to run this snippet\nUSE InternationalDB\nGO\n--
+    Create a new table called 'Customers' in schema 'dbo'\n-- Drop the table if it
+    already exists\nIF OBJECT_ID('dbo.Customers', 'U') IS NOT NULL\nDROP TABLE dbo.Customers\nGO\n"
+kind: ConfigMap
+metadata:
+  name: target-data-sql
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: target-mssql
+    deploymentconfig: target-mssql
+  name: target-mssql-volume
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1G
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: target-mssql
+    app.kubernetes.io/component: target-mssql
+    app.kubernetes.io/instance: target-mssql
+  name: target-mssql
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 1433
+    protocol: TCP
+    targetPort: 1433
+  selector:
+    app: target-mssql
+  sessionAffinity: None
+  type: ClusterIP

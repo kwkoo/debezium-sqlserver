@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cd `dirname $0`
+BASE=`pwd`
+cd - >> /dev/null
+
+oc delete -f ${BASE}/../yaml/jdbc-connector.yaml
+oc delete -f ${BASE}/../yaml/debezium-connector.yaml
+oc delete -f ${BASE}/../yaml/debezium.yaml
+oc delete -f ${BASE}/../yaml/kafka.yaml
