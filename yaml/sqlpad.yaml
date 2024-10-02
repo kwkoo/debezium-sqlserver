@@ -21,6 +21,8 @@ spec:
         env:
         - name: SQLPAD_PORT
           value: "3000"
+        - name: SQLPAD_SEED_DATA_PATH
+          value: /etc/sqlpad
         - name: SQLPAD_ADMIN
           value: admin
         - name: SQLPAD_ADMIN_PASSWORD
@@ -53,15 +55,24 @@ spec:
           value: sa
         - name: SQLPAD_CONNECTIONS__target__password
           value: Password!
+        - name: SQLPAD_QUERIES__showtables__name
+          value: Show Tables
+        - name: SQLPAD_QUERIES__showtables__queryText
+          value: "SELECT * FROM SYS.TABLES"
         ports:
         - containerPort: 3000
         volumeMounts:
         - name: data
           mountPath: /var/lib/sqlpad
+        - name: config
+          mountPath: /etc/sqlpad/queries
         resources: {}
       volumes:
       - name: data
         emptyDir: {}
+      - name: config
+        configMap:
+          name: sqlpad
 status: {}
 ---
 apiVersion: v1
@@ -98,3 +109,93 @@ spec:
     weight: 100
   wildcardPolicy: None
 status: {}
+---
+apiVersion: v1
+data:
+  add_new_column.json: |-
+    {
+        "id": "alter",
+        "name": "Add New Column",
+        "connectionId": "source",
+        "queryText": "ALTER TABLE dbo.Customers ADD phone varchar(15)",
+        "createdBy": "admin",
+        "acl": [
+          {
+            "groupId": "__EVERYONE__",
+            "write": true
+          }
+        ]
+      }
+  change_capture_instance.json: |-
+    {
+        "id": "change-capture-instance",
+        "name": "Change Capture Instance",
+        "connectionId": "source",
+        "queryText": "EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'Customers', @role_name = NULL, @supports_net_changes = 0, @capture_instance = 'dbo_customers_v2'",
+        "createdBy": "admin",
+        "acl": [
+          {
+            "groupId": "__EVERYONE__",
+            "write": true
+          }
+        ]
+      }
+  insert.json: |-
+    {
+        "id": "insert",
+        "name": "Insert New Customer",
+        "connectionId": "source",
+        "queryText": "INSERT INTO dbo.Customers values (1004, 'Laurie', 'York', 'laurie@york.com')",
+        "createdBy": "admin",
+        "acl": [
+          {
+            "groupId": "__EVERYONE__",
+            "write": true
+          }
+        ]
+      }
+  select_source.json: |-
+    {
+        "id": "select-source",
+        "name": "Customers in Source",
+        "connectionId": "source",
+        "queryText": "SELECT * FROM dbo.Customers",
+        "createdBy": "admin",
+        "acl": [
+          {
+            "groupId": "__EVERYONE__",
+            "write": true
+          }
+        ]
+      }
+  select_target.json: |-
+    {
+        "id": "select-target",
+        "name": "Customers in Target",
+        "connectionId": "target",
+        "queryText": "SELECT * FROM dbo.Customers",
+        "createdBy": "admin",
+        "acl": [
+          {
+            "groupId": "__EVERYONE__",
+            "write": true
+          }
+        ]
+      }
+  update_phone.json: |-
+    {
+        "id": "update-phone",
+        "name": "Update Phone",
+        "connectionId": "source",
+        "queryText": "UPDATE dbo.Customers SET phone='12345678' WHERE id=1004",
+        "createdBy": "admin",
+        "acl": [
+          {
+            "groupId": "__EVERYONE__",
+            "write": true
+          }
+        ]
+      }
+kind: ConfigMap
+metadata:
+  name: sqlpad

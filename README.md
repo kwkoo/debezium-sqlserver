@@ -40,13 +40,7 @@ Before you start the demo
 
 01. Examine the `customers` table in the source database
 
-	*   In sqlpad, select `Source Database` in the databases dropdown box
-
-	*   Show that the `dbo.Customers` table exists
-
-	*   Run the following query
-
-			SELECT * FROM dbo.Customers
+	*   In sqlpad, select `Queries` / `Customers in Source` / `Run`
 
 		You should see 3 rows in the table
 
@@ -91,27 +85,13 @@ Before you start the demo
 
 01. Query the target database
 
-	*   In sqlpad, select `Target Database` in the databases dropdown box
-
-	*   Show that the `dbo.Customers` table appears in the left pane
-
-	*   Run the following query
-
-			SELECT * FROM dbo.Customers
+	*   In sqlpad, select `Queries` / `Customers in Target` / `Run`
 
 		The `Customers` table should contain 3 rows
 
 01. Insert a new row into the `Customers` table in the source database
 
-	*   In sqlpad, select `Source Database` in the databases dropdown box
-
-	*   Run the following query
-
-			INSERT INTO dbo.Customers values
-		    (1004,
-		    'Laurie',
-		    'York',
-		    'laurie@york.com')
+	*   In sqlpad, select `Queries` / `Insert New Customer` / `Run`
 
 01. Query the `Customers` table in the target database
 
@@ -119,51 +99,26 @@ Before you start the demo
 
 	*   Show that the `dbo.Customers` table appears in the left pane
 
-	*   Run the following query
-
-			SELECT * FROM dbo.Customers
+	*   Select `Queries` / `Customers in Target` / `Run`
 
 		The `Customers` table should contain 4 rows
 
 01. Add a new column to the `Customers` table in the source database
 
-	*   In sqlpad, select `Source Database` in the databases dropdown box
-
-	*   Run the following query
-
-			ALTER TABLE dbo.Customers
-		    ADD phone varchar(15)
+	*   In sqlpad, select `Queries` / `Add New Column` / `Run`
+	*   Select `Source Database` / `Refresh schema` (the circular icon with an arrow) - the Customers table should now include a `phone` column
 
 01. Notify CDC of the schema change - this is a [limitation of CDC on SQL Server](https://debezium.io/documentation/reference/stable/connectors/sqlserver.html#sqlserver-schema-evolution)
 
-	*   In sqlpad, select `Source Database` in the databases dropdown box
-
-	*   Run the following query
-
-			EXEC sys.sp_cdc_enable_table
-		    @source_schema = 'dbo',
-		    @source_name = 'Customers',
-		    @role_name = NULL,
-		    @supports_net_changes = 0,
-		    @capture_instance = 'dbo_customers_v2'
+	*   In sqlpad, select `Queries` / `Change Capture Instance` / `Run`
 
 01. Update a record with a new column value
 
-	*   In sqlpad, select `Source Database` in the databases dropdown box
-
-	*   Run the following query
-
-			UPDATE dbo.Customers
-		    SET phone='12345678'
-		    WHERE id=1004
+	*   In sqlpad, select `Queries` / `Update phone` / `Run`
 
 01. Query the `Customers` table in the target database
 
-	*   In sqlpad, select `Target Database` in the databases dropdown box
-
-	*   Run the following query
-
-			SELECT * FROM dbo.Customers
+	*   In sqlpad, select `Queries` / `Customers in Target` / `Run`
 
 		The `Customers` table should contain a `phone` column
 
