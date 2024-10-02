@@ -3,7 +3,7 @@ kind: KafkaConnector
 metadata:
   labels:
     strimzi.io/cluster: debezium-kafka-connect-cluster
-  name: jdbc-connector
+  name: target-connector
 spec:
   class: io.debezium.connector.jdbc.JdbcSinkConnector
   config:

@@ -3,7 +3,7 @@ kind: KafkaConnector
 metadata:
   labels:
     strimzi.io/cluster: debezium-kafka-connect-cluster
-  name: debezium-connector
+  name: source-connector
 spec:
   class: io.debezium.connector.sqlserver.SqlServerConnector
   config:

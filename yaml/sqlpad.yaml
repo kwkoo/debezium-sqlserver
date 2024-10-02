@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sqlpad
+  name: sqlpad
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sqlpad
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: sqlpad
+    spec:
+      containers:
+      - image: docker.io/sqlpad/sqlpad:5
+        name: sqlpad
+        env:
+        - name: SQLPAD_ADMIN
+          value: admin
+        - name: SQLPAD_ADMIN_PASSWORD
+          value: admin
+        - name: SQLPAD_APP_LOG_LEVEL
+          value: info
+        - name: SQLPAD_WEB_LOG_LEVEL
+          value: warn
+        - name: SQLPAD_CONNECTIONS__source__name
+          value: Source Database
+        - name: SQLPAD_CONNECTIONS__source__driver
+          value: sqlserver
+        - name: SQLPAD_CONNECTIONS__source__host
+          value: source-mssql
+        - name: SQLPAD_CONNECTIONS__source__database
+          value: InternationalDB
+        - name: SQLPAD_CONNECTIONS__source__username
+          value: sa
+        - name: SQLPAD_CONNECTIONS__source__password
+          value: Password!
+        - name: SQLPAD_CONNECTIONS__target__name
+          value: Target Database
+        - name: SQLPAD_CONNECTIONS__target__driver
+          value: sqlserver
+        - name: SQLPAD_CONNECTIONS__target__host
+          value: target-mssql
+        - name: SQLPAD_CONNECTIONS__target__database
+          value: InternationalDB
+        - name: SQLPAD_CONNECTIONS__target__username
+          value: sa
+        - name: SQLPAD_CONNECTIONS__target__password
+          value: Password!
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/sqlpad
+        resources: {}
+      volumes:
+      - name: data
+        emptyDir: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: sqlpad
+  name: sqlpad
+spec:
+  ports:
+  - port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: sqlpad
+status:
+  loadBalancer: {}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: sqlpad
+  name: sqlpad
+spec:
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Allow
+  port:
+    targetPort: 3000
+  to:
+    kind: Service
+    name: sqlpad
+    weight: 100
+  wildcardPolicy: None
+status: {}

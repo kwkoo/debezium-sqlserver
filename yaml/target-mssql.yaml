@@ -55,7 +55,6 @@ spec:
       creationTimestamp: null
       labels:
         app: target-mssql
-        deploymentconfig: target-mssql
     spec:
       serviceAccountName: target-mssql
       containers:
