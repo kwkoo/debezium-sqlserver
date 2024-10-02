@@ -43,7 +43,7 @@ deploy-sqlpad:
 .PHONY: debezium
 debezium:
 	@/bin/echo -n "waiting for Kafka pod to appear..."
-	@until oc get -n $(PROJ) po/demo-kafka-0 2>/dev/null; do \
+	@until oc get -n $(PROJ) po/demo-kafka-0 >/dev/null 2>/dev/null; do \
 	  /bin/echo -n "."; \
 	  sleep 5; \
 	done
@@ -66,21 +66,21 @@ sqlpad:
 clean:
 	oc project default
 	@echo "deleting KafkaConnectors"
-	oc delete -n $(PROJ) -f $(BASE)/yaml/target-connector.yaml
-	oc delete -n $(PROJ) -f $(BASE)/yaml/source-connector.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/target-connector.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/source-connector.yaml
 	@echo "deleting Debezium"
-	oc delete -n $(PROJ) -f $(BASE)/yaml/debezium.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/debezium.yaml
 	@echo "deleting Kafka"
-	oc delete -n $(PROJ) -f $(BASE)/yaml/kafka.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/kafka.yaml
 	@echo "deleting databases"
-	oc delete -n $(PROJ) -f $(BASE)/yaml/target-mssql.yaml
-	oc delete -n $(PROJ) -f $(BASE)/yaml/source-mssql.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/target-mssql.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/source-mssql.yaml
 	@echo "deleting sqlpad"
-	oc delete -n $(PROJ) -f $(BASE)/yaml/sqlpad.yaml
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/sqlpad.yaml
 	@/bin/echo -n "waiting for all pods to disappear..."
 	@while [ `oc get -n $(PROJ) po 2>/dev/null | wc -l` -gt 0 ]; do \
 	  /bin/echo -n "."; \
 	  sleep 5; \
 	done
 	@echo "done"
-	oc delete project $(PROJ)
+	-oc delete project $(PROJ)
