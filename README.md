@@ -17,6 +17,7 @@ This demo shows how you replicate from one MS SQL Server to another MS SQL Serve
 	*   Install the Streams for Apache Kafka operator
 	*   Deploy the source and target MS SQL Server databases
 	*   Deploy the Kafka cluster
+	*   Deploy Kafdrop
 	*   Deploy Debezium
 
 
@@ -31,6 +32,10 @@ Before you start the demo
 		make sqlpad
 
 *   Login to sqlpad as `admin` / `admin`
+
+*    Open a web browser to the kafdrop interface
+
+		make kafdrop
 
 *   **Optional**: If you want to look at the Debezium logs
 
@@ -60,22 +65,10 @@ Before you start the demo
 
 01. List the topics in Kafka
 
-		oc rsh demo-kafka-0 \
-		  /opt/kafka/bin/kafka-topics.sh \
-		    --bootstrap-server demo-kafka-bootstrap:9092 \
-		    --list
-
-	You should see a topic named `debezium.InternationalDB.dbo.Customers`
+	*   Switch over to the kafdrop browser window and refresh the page
+	*   You should see a topic named `debezium.InternationalDB.dbo.Customers`
 	
-01. Examine the messages in that topic
-
-		oc rsh demo-kafka-0 \
-		  /opt/kafka/bin/kafka-console-consumer.sh \
-		    --bootstrap-server demo-kafka-bootstrap:9092 \
-		    --topic debezium.InternationalDB.dbo.Customers \
-		    --from-beginning
-
-	Ctrl-C to exit the consumer
+01. Examine the messages in that topic by selecting `debezium.InternationalDB.dbo.Customers` / `View Messages` / `View Messages`
 
 01. Deploy the sink connector - this syncs data from Kafka to the target database
 
@@ -147,3 +140,36 @@ Before you start the demo
 		    LIKE N'SQL Server Agent (%'"
 
 *   The source database was converted from a `Deployment` to a `StatefulSet` because pods belonging to a `Deployment` have very long hostnames, and the MS SQL Server Agent will not run when the hostname exceeds a certain length
+
+
+## Command Line Queries
+
+*   Query the source database
+
+		oc rsh sts/source-mssql \
+		  /opt/mssql-tools18/bin/sqlcmd \
+		    -No \
+		    -S localhost \
+		    -U sa \
+		    -P Password! \
+		    -d InternationalDB \
+		    -Q "select * from dbo.Customers"
+
+*   List Kafka topics
+
+		oc rsh demo-kafka-0 \
+		  /opt/kafka/bin/kafka-topics.sh \
+		    --bootstrap-server demo-kafka-bootstrap:9092 \
+		    --list
+
+*   Consume Kafka topic
+
+		oc rsh demo-kafka-0 \
+		  /opt/kafka/bin/kafka-console-consumer.sh \
+		    --bootstrap-server demo-kafka-bootstrap:9092 \
+		    --topic debezium.InternationalDB.dbo.Customers \
+		    --from-beginning
+
+*   Examine Debezium logs
+
+		oc logs -f debezium-kafka-connect-cluster-connect-0

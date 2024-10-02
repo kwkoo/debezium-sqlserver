@@ -3,7 +3,7 @@ PROJ=demo
 BASE:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 ,PHONY: deploy
-deploy: check-login strimzi db deploy-sqlpad kafka debezium
+deploy: check-login strimzi db deploy-sqlpad kafka deploy-kafdrop debezium
 	@echo "installation complete"
 
 ,PHONY: check-login
@@ -40,6 +40,19 @@ deploy-sqlpad:
 	@echo "installing sqlpad..."
 	oc apply -n $(PROJ) -f $(BASE)/yaml/sqlpad.yaml
 
+.PHONY: deploy-kafdrop
+deploy-kafdrop:
+	@/bin/echo -n "waiting for Kafka pod to appear..."
+	@until oc get -n $(PROJ) po/demo-kafka-0 >/dev/null 2>/dev/null; do \
+	  /bin/echo -n "."; \
+	  sleep 5; \
+	done
+	@echo "done"
+	@echo "waiting for Kafka to be ready..."
+	oc wait -n $(PROJ) --for=condition=Ready --timeout=300s po/demo-kafka-0
+	@echo "installing kafdrop..."
+	oc apply -n $(PROJ) -f $(BASE)/yaml/kafdrop.yaml
+
 .PHONY: debezium
 debezium:
 	@/bin/echo -n "waiting for Kafka pod to appear..."
@@ -62,6 +75,15 @@ sqlpad:
 	  echo "$$url"; \
 	fi
 
+.PHONY: kafdrop
+kafdrop:
+	@url="https://`oc get -n $(PROJ) route/kafdrop -o jsonpath='{.spec.host}'`"; \
+	if [ "`uname -s`" = "Darwin" ]; then \
+	  open "$$url"; \
+	else \
+	  echo "$$url"; \
+	fi
+
 .PHONY: clean
 clean:
 	oc project default
@@ -77,6 +99,8 @@ clean:
 	-oc delete -n $(PROJ) -f $(BASE)/yaml/source-mssql.yaml
 	@echo "deleting sqlpad"
 	-oc delete -n $(PROJ) -f $(BASE)/yaml/sqlpad.yaml
+	@echo "deleting kafdrop"
+	-oc delete -n $(PROJ) -f $(BASE)/yaml/kafdrop.yaml
 	@/bin/echo -n "waiting for all pods to disappear..."
 	@while [ `oc get -n $(PROJ) po 2>/dev/null | wc -l` -gt 0 ]; do \
 	  /bin/echo -n "."; \
