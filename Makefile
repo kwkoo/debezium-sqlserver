@@ -108,3 +108,7 @@ clean:
 	done
 	@echo "done"
 	-oc delete project $(PROJ)
+
+.PHONY: debezium-logs
+debezium-logs:
+	oc logs -n $(PROJ) -f debezium-kafka-connect-cluster-connect-0
