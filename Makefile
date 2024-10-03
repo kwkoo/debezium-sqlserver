@@ -1,9 +1,10 @@
 PROJ=demo
+TRUSTSTORE_PASSWORD=randompassword
 
 BASE:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 ,PHONY: deploy
-deploy: check-login strimzi db deploy-sqlpad kafka deploy-kafdrop debezium
+deploy: check-login strimzi db deploy-sqlpad kafka ca-cert deploy-kafdrop debezium
 	@echo "installation complete"
 
 ,PHONY: check-login
@@ -27,6 +28,22 @@ kafka:
 	@echo "installing Kafka..."
 	oc apply -n $(PROJ) -f $(BASE)/yaml/kafka.yaml
 
+.PHONY: ca-cert
+ca-cert:
+	@/bin/echo -n "waiting for Kafka CA certificate secret..."
+	@until oc get -n $(PROJ) secret/demo-cluster-ca-cert >/dev/null 2>/dev/null; do \
+	  /bin/echo -n "."; \
+	  sleep 5; \
+	done
+	@echo "done"
+	-oc delete -n $(PROJ) secret/debezium-ca 2>/dev/null
+	@echo "creating trust store in secret..."
+	tmpdir=`mktemp -d`; \
+	oc extract -n $(PROJ) secret/demo-cluster-ca-cert --to=$$tmpdir; \
+	keytool -keystore $$tmpdir/truststore.jks -storepass $(TRUSTSTORE_PASSWORD) -alias CARoot -import -file $$tmpdir/ca.crt -noprompt; \
+	oc create secret generic debezium-ca -n $(PROJ) --from-file=$$tmpdir/truststore.jks; \
+	rm -rf $$tmpdir
+
 .PHONY: db
 db:
 	@oc new-project $(PROJ) || echo "$(PROJ) already exists"
@@ -40,6 +57,7 @@ deploy-sqlpad:
 	@echo "installing sqlpad..."
 	oc apply -n $(PROJ) -f $(BASE)/yaml/sqlpad.yaml
 
+# must be called after ca-cert because it relies on the debezium-ca secret
 .PHONY: deploy-kafdrop
 deploy-kafdrop:
 	@/bin/echo -n "waiting for Kafka pod to appear..."
@@ -52,6 +70,20 @@ deploy-kafdrop:
 	oc wait -n $(PROJ) --for=condition=Ready --timeout=300s po/demo-kafka-0
 	@echo "installing kafdrop..."
 	oc apply -n $(PROJ) -f $(BASE)/yaml/kafdrop.yaml
+	@/bin/echo -n "waiting for kafdrop deployment to appear..."
+	until oc get -n $(PROJ) deploy/kafdrop >/dev/null 2>/dev/null; do \
+	  /bin/echo -n "."; \
+	  sleep 5; \
+	done
+	@echo "done"
+	tmpdir=`mktemp -d`; \
+	oc extract -n $(PROJ) secret/debezium-ca --to=$$tmpdir; \
+	echo "ssl.truststore.password=$(TRUSTSTORE_PASSWORD)" > $$tmpdir/connection.properties; \
+	echo "security.protocol=SSL" >> $$tmpdir/connection.properties; \
+	KAFKA_PROPERTIES="`base64 < $$tmpdir/connection.properties`"; \
+	KAFKA_TRUSTSTORE="`base64 < $$tmpdir/truststore.jks`"; \
+	oc set env -n $(PROJ) deploy/kafdrop KAFKA_PROPERTIES=$$KAFKA_PROPERTIES KAFKA_TRUSTSTORE=$$KAFKA_TRUSTSTORE; \
+	rm -rf $$tmpdir
 
 .PHONY: debezium
 debezium:
@@ -92,6 +124,7 @@ clean:
 	-oc delete -n $(PROJ) -f $(BASE)/yaml/source-connector.yaml
 	@echo "deleting Debezium"
 	-oc delete -n $(PROJ) -f $(BASE)/yaml/debezium.yaml
+	-oc delete -n $(PROJ) secret/debezium-ca
 	@echo "deleting Kafka"
 	-oc delete -n $(PROJ) -f $(BASE)/yaml/kafka.yaml
 	@echo "deleting databases"

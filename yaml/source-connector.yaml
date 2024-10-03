@@ -7,7 +7,13 @@ metadata:
 spec:
   class: io.debezium.connector.sqlserver.SqlServerConnector
   config:
-    schema.history.internal.kafka.bootstrap.servers: demo-kafka-bootstrap:9092
+    schema.history.internal.kafka.bootstrap.servers: demo-kafka-bootstrap:9093
+    schema.history.internal.producer.security.protocol: SSL
+    schema.history.internal.producer.ssl.truststore.location: /opt/kafka/external-configuration/debezium-ca/truststore.jks
+    schema.history.internal.producer.ssl.truststore.password: randompassword
+    schema.history.internal.consumer.security.protocol: SSL
+    schema.history.internal.consumer.ssl.truststore.location: /opt/kafka/external-configuration/debezium-ca/truststore.jks
+    schema.history.internal.consumer.ssl.truststore.password: randompassword
     schema.history.internal.kafka.topic: schema-changes
     database.hostname: source-mssql
     database.port: 1433
